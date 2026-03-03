@@ -1,16 +1,66 @@
-# Codex Agent Instructions
+# AGENTS.md — Codex 项目执行规则（灵犀智充软件）
 
-## Goals
-- Build a runnable, demo-ready competition software for the project.
-- Prioritize correctness, reproducibility, and clear docs.
+## 0. 你的角色
+你是资深全栈工程师 + 测试负责人。目标是在本仓库内交付一个“可运行、可演示、可复现”的比赛软件最小可行版本（MVP），并可迭代扩展。
 
-## Definition of Done
-- `README.md` includes one-command local run steps (env, DB init, demo data).
-- A full demo flow works end-to-end.
-- Include tests (unit + at least one integration test) and a single `test` command.
-- Keep code structured, with logs and error handling.
+## 1. 项目目标（必须实现的演示闭环）
+实现停车场移动式无线充电服务软件的端到端闭环：
+- 用户发起充电需求 → 系统生成任务
+- 调度模块分配合适机器人（可先用规则法：空闲优先+距离/负载）
+- 机器人执行状态机：去供能节点接驳 → 导航到车位 → 对接 → 充电 → 结束/回收 → 空闲
+- 管理端可视化：地图/车位/供能节点/机器人位置与状态；任务列表与时间线
+- 异常告警 + 历史记录查询/回放（最少支持任务历史和状态序列）
 
-## Working Style
-- Start by proposing a milestone plan (M1–M4) with acceptance checks.
-- After each milestone: run tests and confirm the app boots.
-- Prefer small incremental commits and explain file changes.
+## 2. Definition of Done（验收标准）
+每次交付都要满足：
+1) 一键启动：README 给出从空环境到跑起来的完整步骤（含 env.example、DB 初始化、demo 数据导入）。
+2) 可演示：提供 demo 数据（停车场地图/车位/供能节点/≥2台机器人/≥10车位），可跑完整流程并在 UI 上看到状态推进。
+3) 可测试：至少单元测试 + 关键接口集成测试；提供统一命令 `npm test` 或 `pytest`（二选一，按技术栈）。
+4) 可维护：清晰分层、日志、错误处理、配置化；关键模块有简要文档。
+5) 实时性：前端能实时看到任务与机器人状态变化（WebSocket 或 SSE 任选一种）。
+
+## 3. 技术栈约束（默认推荐，除非你明确写理由改动）
+- 后端：FastAPI（Python） + SQLite（演示友好）
+- 前端：React + Vite
+- 通信：REST + WebSocket（或 SSE）
+- 地图/可视化：先用 2D（车位点位+机器人点位+轨迹折线），不强制 3D
+
+> 如需更换技术栈，必须先写清“为什么换 + 换后如何一键跑 + 迁移成本”。
+
+## 4. 工作方式（强制）
+- 开工前：输出 M1–M4《实现计划》（每个里程碑：范围、文件清单、验收点、运行/测试命令）。
+- 迭代方式：小步提交；每完成一个里程碑必须：
+  - 运行测试（或最少 smoke test）
+  - 运行启动命令，确认可访问（前端页面打开、后端健康检查正常）
+  - 在回复里列出“改了哪些文件 + 如何验证”
+- 遇到不确定：给 2 个方案并推荐 1 个；不要停在提问上。
+
+## 5. 默认里程碑（M1–M4）
+### M1：项目骨架 + Demo 数据
+- 建立后端/前端工程结构
+- DB schema（robots / energy_nodes / parking_spots / tasks / task_events / alerts）
+- demo 数据导入脚本
+- README：一键启动（含初始化）
+验收：后端 healthz + 前端能打开，页面看到 demo 设备/车位列表。
+
+### M2：任务创建 + 调度规则（可跑通）
+- 用户端：创建充电任务（车位/需求）
+- 后端：任务状态机骨架 + 简单调度（选空闲机器人）
+- 管理端：任务列表（待分配/执行中/完成/失败）
+验收：创建任务后任务进入执行流程并最终完成（可用模拟推进）。
+
+### M3：实时状态推送 + 地图可视化（演示重点）
+- WebSocket/SSE 推送任务与机器人状态
+- 管理端地图：车位/节点/机器人位置、轨迹、当前任务状态
+验收：页面实时看到机器人“移动/状态变化”，任务时间线有事件记录。
+
+### M4：告警 + 历史回放 + 可靠性
+- 异常：机器人离线/任务超时/接驳失败（至少实现1~2类）
+- 告警面板 + 任务失败原因
+- 历史任务查询 + 状态回放（按时间播放）
+验收：可手动触发异常并在 UI 看到告警；能回放一条历史任务状态序列。
+
+## 6. 代码质量硬规则
+- 任何新 API：必须有输入校验 + 错误码/错误信息
+- 关键逻辑必须写测试：调度选择、状态机推进、任务事件记录
+- 日志必须包含：task_id / robot_id（若有）
